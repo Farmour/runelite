@@ -126,4 +126,15 @@ public interface ClanChatConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigItem(
+			keyName = "clanAsDefaultChat",
+			name = "Set Clan Chat as default",
+			description = "Messages will have / pre-typed.",
+			position = 8
+	)
+	default boolean clanAsDefaultChat()
+	{
+		return false;
+	}
 }

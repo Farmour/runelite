@@ -26,6 +26,7 @@
  */
 package net.runelite.client.plugins.clanchat;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.inject.Provides;
@@ -39,6 +40,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatLineBuffer;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.ClanMember;
@@ -84,6 +86,7 @@ import net.runelite.client.util.Text;
 	description = "Add rank icons to users talking in clan chat",
 	tags = {"icons", "rank", "recent"}
 )
+@Slf4j
 public class ClanChatPlugin extends Plugin
 {
 	private static final int MAX_CHATS = 10;
@@ -399,6 +402,9 @@ public class ClanChatPlugin extends Plugin
 	@Subscribe
 	public void onChatMessage(ChatMessage chatMessage)
 	{
+		final String playerName = client.getLocalPlayer().getName();
+		final String messageSenderTrimmed = chatMessage.getName().substring(chatMessage.getName().indexOf(">")+1).trim();
+		log.debug(playerName+" "+config.clanAsDefaultChat()+" "+messageSenderTrimmed);
 		if (client.getGameState() != GameState.LOADING && client.getGameState() != GameState.LOGGED_IN)
 		{
 			return;
@@ -420,12 +426,22 @@ public class ClanChatPlugin extends Plugin
 				break;
 			case PUBLICCHAT:
 			case MODCHAT:
+				if (config.clanAsDefaultChat() && (messageSenderTrimmed.equals(playerName)))
+				{
+					log.debug("inside public");
+					addSlashToChat();
+				}
 				if (!config.publicChatIcons())
 				{
 					return;
 				}
 				break;
 			case FRIENDSCHAT:
+				if (config.clanAsDefaultChat() && (messageSenderTrimmed.equals(playerName)))
+				{
+					log.debug("inside friends");
+					addSlashToChat();
+				}
 				if (!config.clanChatIcons())
 				{
 					return;
@@ -449,6 +465,12 @@ public class ClanChatPlugin extends Plugin
 			removeClanCounter();
 
 			clanJoinMessages.clear();
+		}
+		else if (gameState == GameState.LOGGED_IN){
+			if (config.clanAsDefaultChat()){
+				log.debug("inside logged in");
+				addSlashToChat();
+			}
 		}
 	}
 
@@ -594,5 +616,20 @@ public class ClanChatPlugin extends Plugin
 		final BufferedImage image = spriteManager.getSprite(SpriteID.TAB_CLAN_CHAT, 0);
 		clanMemberCounter = new ClanChatIndicator(image, this);
 		infoBoxManager.addInfoBox(clanMemberCounter);
+	}
+
+	private void addSlashToChat()
+	{
+		String currentTypedText = client.getVar(VarClientStr.CHATBOX_TYPED_TEXT);
+		// Was running into a bug that would put two slashes on successful chat
+		if (Strings.isNullOrEmpty(currentTypedText) || currentTypedText.charAt(0)!='/')
+		{
+			clientThread.invoke(() ->
+			{
+				client.setVar(VarClientStr.CHATBOX_TYPED_TEXT, "/" + currentTypedText);
+				client.refreshChat();
+			});
+
+		}
 	}
 }
